@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Data Viz</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .param {
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        .param-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .param-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        canvas {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            display: block;
+            margin: 0 auto;
+            cursor: crosshair;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .info {
+            text-align: center;
+            margin-top: 15px;
+            opacity: 0.7;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; margin-bottom: 30px;">Interactive Data Visualization</h1>
+        
+        <div class="controls">
+            <div class="param">
+                <div class="param-label">Particle Count</div>
+                <div class="param-value" id="particleCount">100</div>
+            </div>
+            <div class="param">
+                <div class="param-label">Speed Multiplier</div>
+                <div class="param-value" id="speedMultiplier">1.0</div>
+            </div>
+            <div class="param">
+                <div class="param-label">Attraction Force</div>
+                <div class="param-value" id="attractionForce">0.5</div>
+            </div>
+            <div class="param">
+                <div class="param-label">Color Hue</div>
+                <div class="param-value" id="colorHue">180°</div>
+            </div>
+            <div class="param">
+                <div class="param-label">Size Scale</div>
+                <div class="param-value" id="sizeScale">1.0</div>
+            </div>
+        </div>
+        
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div class="info">
+            Move your mouse over the canvas to control parameters • Left-right: particle count & speed • Up-down: attraction & color
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Parameters controlled by mouse
+        let params = {
+            particleCount: 100,
+            speedMultiplier: 1.0,
+            attractionForce: 0.5,
+            colorHue: 180,
+            sizeScale: 1.0,
+            mouseX: canvas.width / 2,
+            mouseY: canvas.height / 2
+        };
+        
+        // Particle system
+        let particles = [];
+        
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.size = Math.random() * 3 + 1;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.005;
+            }
+            
+            update() {
+                // Attraction to mouse
+                const dx = params.mouseX - this.x;
+                const dy = params.mouseY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 0) {
+                    const force = params.attractionForce / (distance * 0.01 + 1);
+                    this.vx += (dx / distance) * force * 0.1;
+                    this.vy += (dy / distance) * force * 0.1;
+                }
+                
+                // Apply velocity with speed multiplier
+                this.x += this.vx * params.speedMultiplier;
+                this.y += this.vy * params.speedMultiplier;
+                
+                // Damping
+                this.vx *= 0.99;
+                this.vy *= 0.99;
+                
+                // Boundaries
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -0.8;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -0.8;
+                
+                this.x = Math.max(0, Math.min(canvas.width, this.x));
+                this.y = Math.max(0, Math.min(canvas.height, this.y));
+                
+                // Life cycle
+                this.life -= this.decay;
+                if (this.life <= 0) {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.life = 1.0;
+                }
+            }
+            
+            draw() {
+                const alpha = this.life * 0.8;
+                const size = this.size * params.sizeScale;
+                
+                // Gradient based on distance from mouse
+                const dx = params.mouseX - this.x;
+                const dy = params.mouseY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const hue = (params.colorHue + distance * 0.3) % 360;
+                
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                
+                // Glow effect
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = `hsl(${hue}, 70%, 60%)`;
+                
+                // Particle
+                ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner highlight
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.fillStyle = `hsl(${hue}, 80%, 80%)`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+        
+        // Initialize particles
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < params.particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+        
+        // Mouse event handler
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            params.mouseX = e.clientX - rect.left;
+            params.mouseY = e.clientY - rect.top;
+            
+            // Map mouse position to parameters
+            const mouseXNorm = params.mouseX / canvas.width;
+            const mouseYNorm = params.mouseY / canvas.height;
+            
+            // Horizontal movement controls particle count and speed
+            params.particleCount = Math.floor(50 + mouseXNorm * 200);
+            params.speedMultiplier = 0.2 + mouseXNorm * 2.8;
+            
+            // Vertical movement controls attraction and color
+            params.attractionForce = mouseYNorm * 2;
+            params.colorHue = Math.floor(mouseYNorm * 360);
+            params.sizeScale = 0.5 + mouseYNorm * 1.5;
+            
+            // Adjust particle count
+            while (particles.length < params.particleCount) {
+                particles.push(new Particle());
+            }
+            while (particles.length > params.particleCount) {
+                particles.pop();
+            }
+            
+            // Update UI
+            updateControls();
+        });
+        
+        // Update control display
+        function updateControls() {
+            document.getElementById('particleCount').textContent = params.particleCount;
+            document.getElementById('speedMultiplier').textContent = params.speedMultiplier.toFixed(1);
+            document.getElementById('attractionForce').textContent = params.attractionForce.toFixed(1);
+            document.getElementById('colorHue').textContent = params.colorHue + '°';
+            document.getElementById('sizeScale').textContent = params.sizeScale.toFixed(1);
+        }
+        
+        // Animation loop
+        function animate() {
+            // Clear canvas with trail effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and draw particles
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+            
+            // Draw connections between nearby particles
+            ctx.strokeStyle = `hsla(${params.colorHue}, 50%, 70%, 0.2)`;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 100) {
+                        ctx.globalAlpha = (100 - distance) / 100 * 0.3;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            ctx.globalAlpha = 1;
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Initialize and start
+        initParticles();
+        updateControls();
+        animate();
+        
+        // Handle canvas resize
+        window.addEventListener('resize', () => {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.min(800, window.innerWidth - 40);
+            canvas.height = 600;
+        });
+    </script>
+</body>
+</html>
