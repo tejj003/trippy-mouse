@@ -4,19 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Data Viz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
-            font-family: 'Arial', sans-serif;
+            background-color: #0a0a0a;
+            background-image: 
+                radial-gradient(circle at center, rgba(35, 35, 35, 0.2) 0%, rgba(10, 10, 10, 0.4) 100%),
+                repeating-linear-gradient(0deg, rgba(20, 20, 20, 0.1) 0px, rgba(0, 0, 0, 0.1) 1px);
+            font-family: 'DM Sans', sans-serif;
             color: white;
             overflow-x: hidden;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 0 20px;
         }
         
         .controls {
@@ -38,6 +45,37 @@
             font-size: 12px;
             opacity: 0.8;
             margin-bottom: 5px;
+            position: relative;
+            cursor: help;
+        }
+        
+        .param-label[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-top: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .param-label[data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-bottom-color: rgba(0, 0, 0, 0.9);
+            margin-top: 1px;
+            z-index: 1000;
         }
         
         .param-value {
@@ -61,6 +99,10 @@
             opacity: 0.7;
             font-size: 14px;
         }
+        
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -69,31 +111,35 @@
         
         <div class="controls">
             <div class="param">
-                <div class="param-label">Particle Count</div>
+                <div class="param-label" data-tooltip="Number of particles on screen (50-250)">Particle Count</div>
                 <div class="param-value" id="particleCount">100</div>
             </div>
             <div class="param">
-                <div class="param-label">Speed Multiplier</div>
+                <div class="param-label" data-tooltip="How fast particles move (0.2x - 3x speed)">Speed Multiplier</div>
                 <div class="param-value" id="speedMultiplier">1.0</div>
             </div>
             <div class="param">
-                <div class="param-label">Attraction Force</div>
+                <div class="param-label" data-tooltip="Strength of magnetic pull toward mouse">Attraction Force</div>
                 <div class="param-value" id="attractionForce">0.5</div>
             </div>
             <div class="param">
-                <div class="param-label">Color Hue</div>
+                <div class="param-label" data-tooltip="Base color of particles (0-360 degrees)">Color Hue</div>
                 <div class="param-value" id="colorHue">180°</div>
             </div>
             <div class="param">
-                <div class="param-label">Size Scale</div>
+                <div class="param-label" data-tooltip="Size scaling factor for all particles">Size Scale</div>
                 <div class="param-value" id="sizeScale">1.0</div>
+            </div>
+            <div class="param">
+                <div class="param-label" data-tooltip="Click canvas to change shape">Shape</div>
+                <div class="param-value" id="shapeType">Circle</div>
             </div>
         </div>
         
-        <canvas id="canvas" width="800" height="600"></canvas>
+        <canvas id="canvas" width="1380" height="700"></canvas>
         
         <div class="info">
-            Move your mouse over the canvas to control parameters • Left-right: particle count & speed • Up-down: attraction & color
+            Move your mouse over the canvas to control parameters • Left-right: particle count & speed • Up-down: attraction & color • Click to change shape
         </div>
     </div>
 
@@ -109,8 +155,11 @@
             colorHue: 180,
             sizeScale: 1.0,
             mouseX: canvas.width / 2,
-            mouseY: canvas.height / 2
+            mouseY: canvas.height / 2,
+            shapeType: 0 // 0: circle, 1: square, 2: triangle, 3: star
         };
+        
+        const shapeNames = ['Circle', 'Square', 'Triangle', 'Star'];
         
         // Particle system
         let particles = [];
@@ -179,20 +228,53 @@
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = `hsl(${hue}, 70%, 60%)`;
                 
-                // Particle
+                // Set fill style
                 ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
-                ctx.fill();
+                
+                // Draw based on shape type
+                this.drawShape(size, params.shapeType);
                 
                 // Inner highlight
                 ctx.globalAlpha = alpha * 0.6;
                 ctx.fillStyle = `hsl(${hue}, 80%, 80%)`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
+                this.drawShape(size * 0.5, params.shapeType);
                 
                 ctx.restore();
+            }
+            
+            drawShape(size, shapeType) {
+                ctx.beginPath();
+                switch(shapeType) {
+                    case 0: // Circle
+                        ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+                        break;
+                    case 1: // Square
+                        ctx.rect(this.x - size, this.y - size, size * 2, size * 2);
+                        break;
+                    case 2: // Triangle
+                        ctx.moveTo(this.x, this.y - size);
+                        ctx.lineTo(this.x - size, this.y + size);
+                        ctx.lineTo(this.x + size, this.y + size);
+                        ctx.closePath();
+                        break;
+                    case 3: // Star
+                        const spikes = 5;
+                        const outerRadius = size;
+                        const innerRadius = size * 0.4;
+                        let rot = Math.PI / 2 * 3;
+                        const step = Math.PI / spikes;
+                        
+                        ctx.moveTo(this.x, this.y - outerRadius);
+                        for (let i = 0; i < spikes; i++) {
+                            ctx.lineTo(this.x + Math.cos(rot) * outerRadius, this.y + Math.sin(rot) * outerRadius);
+                            rot += step;
+                            ctx.lineTo(this.x + Math.cos(rot) * innerRadius, this.y + Math.sin(rot) * innerRadius);
+                            rot += step;
+                        }
+                        ctx.closePath();
+                        break;
+                }
+                ctx.fill();
             }
         }
         
@@ -235,6 +317,12 @@
             updateControls();
         });
         
+        // Click event handler
+        canvas.addEventListener('click', (e) => {
+            params.shapeType = (params.shapeType + 1) % 4;
+            updateControls();
+        });
+        
         // Update control display
         function updateControls() {
             document.getElementById('particleCount').textContent = params.particleCount;
@@ -242,6 +330,7 @@
             document.getElementById('attractionForce').textContent = params.attractionForce.toFixed(1);
             document.getElementById('colorHue').textContent = params.colorHue + '°';
             document.getElementById('sizeScale').textContent = params.sizeScale.toFixed(1);
+            document.getElementById('shapeType').textContent = shapeNames[params.shapeType];
         }
         
         // Animation loop
@@ -286,9 +375,8 @@
         
         // Handle canvas resize
         window.addEventListener('resize', () => {
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = Math.min(800, window.innerWidth - 40);
-            canvas.height = 600;
+            canvas.width = Math.min(1380, window.innerWidth - 40);
+            canvas.height = Math.min(700, window.innerHeight - 200);
         });
     </script>
 </body>
